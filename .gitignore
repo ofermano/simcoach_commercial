@@ -1,0 +1,37 @@
+# Python (Backend)
+Backend/.venv/
+Backend/venv/
+Backend/__pycache__/
+Backend/**/*.pyc
+Backend/.pytest_cache/
+Backend/.mypy_cache/
+Backend/.ruff_cache/
+
+# Python environment
+*.env.local
+
+# Backend env (keep only example file)
+!Backend/.env.example
+
+# Alembic
+Backend/alembic/*.log
+
+# Node / Vite (Frontend)
+Frontend/node_modules/
+Frontend/client/node_modules/
+Frontend/.turbo/
+Frontend/.npm/
+Frontend/.cache/
+Frontend/client/.vite/
+Frontend/client/dist/
+Frontend/dist/
+
+# Frontend env (keep only example file)
+Frontend/.env
+!Frontend/.env.example
+
+# Build artifacts
+dist/
+build/
+coverage/
+*.coverage

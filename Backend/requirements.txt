@@ -1,0 +1,25 @@
+# FastAPI & server (0.115+ avoids conflicts with llama-stack, vllm, etc. in same env)
+fastapi>=0.115.0,<1.0.0
+uvicorn[standard]==0.27.1
+
+# Database
+sqlalchemy[asyncio]==2.0.25
+asyncpg==0.29.0
+alembic==1.13.1
+
+# Auth (bcrypt<4.1 avoids passlib "no attribute __about__" warning)
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt>=4.0,<4.1
+httpx>=0.27.0
+
+# Email (fastapi-mail 1.4.2 pulls in aiosmtplib>=3.0.2,<4.0)
+fastapi-mail==1.4.2
+
+# Config & validation (pydantic 2.10+ required by fastapi-mail 1.4.2)
+pydantic>=2.10.1,<3.0.0
+pydantic-settings>=2.6.1,<3.0.0
+python-dotenv==1.0.1
+
+# CORS (0.0.20+ avoids conflicts with llama-stack in same env)
+python-multipart>=0.0.20

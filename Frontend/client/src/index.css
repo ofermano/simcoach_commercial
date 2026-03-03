@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-display: 'Oxanium', system-ui, sans-serif;
+    --font-body: 'DM Sans', system-ui, sans-serif;
+
+    /* Racing Dark Theme - Base */
+    --background: 228 15% 5%;
+    --foreground: 0 0% 98%;
+
+    /* Pitch black cards for contrast */
+    --card: 228 15% 7%;
+    --card-foreground: 0 0% 98%;
+    --card-border: 228 15% 15%;
+
+    --popover: 228 15% 7%;
+    --popover-foreground: 0 0% 98%;
+    --popover-border: 228 15% 15%;
+
+    /* Aggressive Racing Red */
+    --primary: 348 83% 47%;
+    --primary-foreground: 0 0% 100%;
+    --primary-border: 348 83% 37%;
+
+    /* Sleek Carbon/Silver */
+    --secondary: 228 15% 15%;
+    --secondary-foreground: 0 0% 98%;
+    --secondary-border: 228 15% 25%;
+
+    --muted: 228 15% 15%;
+    --muted-foreground: 228 15% 65%;
+    --muted-border: 228 15% 20%;
+
+    /* Electric Cyan Accent */
+    --accent: 188 86% 53%;
+    --accent-foreground: 228 15% 5%;
+    --accent-border: 188 86% 43%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --destructive-border: 0 84% 50%;
+
+    --border: 228 15% 15%;
+    --input: 228 15% 15%;
+    --ring: 348 83% 47%;
+
+    --radius: 0.25rem;
+
+    /* Hover elevation effects */
+    --elevate-1: rgba(255, 255, 255, 0.05);
+    --elevate-2: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Force dark mode styling across the entire app */
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary selection:text-white;
+    font-family: var(--font-body);
+    background-image: 
+      radial-gradient(circle at 50% 0%, rgba(25, 30, 40, 0.5) 0%, transparent 70%),
+      url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    @apply font-bold tracking-tight uppercase;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-background/80 backdrop-blur-xl border border-white/10 shadow-2xl;
+  }
+  
+  .text-glow {
+    text-shadow: 0 0 20px hsl(var(--primary) / 0.5);
+  }
+  
+  .tech-border {
+    position: relative;
+  }
+  .tech-border::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 20px;
+    height: 20px;
+    border-bottom: 2px solid hsl(var(--primary));
+    border-right: 2px solid hsl(var(--primary));
+    transition: all 0.3s ease;
+  }
+  .tech-border:hover::after {
+    width: 100%;
+    height: 100%;
+    opacity: 0.5;
+  }
+
+}
