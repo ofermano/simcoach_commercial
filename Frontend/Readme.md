@@ -23,6 +23,8 @@ Then edit `.env`:
 - **VITE_API_URL**: usually `http://localhost:8000`
 - **VITE_GOOGLE_CLIENT_ID**: must match backend `GOOGLE_CLIENT_ID`
 
+- Make sure frontend client url e.g http://localhost:5173 is added in GCP client settings under Authorized JavaScript origins and Authorized redirect URIs
+
 #### Run dev server
 
 ```bash
