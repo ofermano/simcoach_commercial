@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,8 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [googleConfigured, setGoogleConfigured] = useState(!!getGoogleClientId());
+  const tokenGoogleRef = useRef<HTMLDivElement | null>(null);
+  const chooseGoogleRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -85,6 +87,17 @@ export default function Signup() {
       }
     }, setError);
   };
+
+  // Ensure the Google buttons are rendered whenever the relevant step / state changes.
+  useEffect(() => {
+    if (!tokenGoogleRef.current) return;
+    renderTokenGoogleButton(tokenGoogleRef.current);
+  }, [step, token, googleConfigured]);
+
+  useEffect(() => {
+    if (!chooseGoogleRef.current) return;
+    renderChooseGoogleButton(chooseGoogleRef.current);
+  }, [step, googleConfigured]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -255,7 +268,7 @@ export default function Signup() {
                 className="space-y-4"
               >
                 <div
-                  ref={(el) => el && renderTokenGoogleButton(el)}
+                  ref={tokenGoogleRef}
                   className="min-h-[3.5rem] w-full flex items-center justify-center [&>div]:min-h-[3.5rem]"
                   data-testid="container-signup-token-google"
                 />
@@ -384,7 +397,7 @@ export default function Signup() {
                 </div>
 
                 <div
-                  ref={(el) => el && renderChooseGoogleButton(el)}
+                  ref={chooseGoogleRef}
                   className="min-h-[3.5rem] w-full flex items-center justify-center [&>div]:min-h-[3.5rem]"
                   data-testid="container-signup-google"
                 />

@@ -10,35 +10,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Gauge, Loader2, LogOut, CheckCircle2, XCircle, ShieldAlert } from "lucide-react";
+import { Gauge, Loader2, LogOut, ShieldAlert } from "lucide-react";
 import { Link } from "wouter";
 import { adminApiGet, adminApiPost, clearStoredAdminToken } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
-interface WhitelistApplication {
+interface WhitelistUser {
   id: number;
   email: string;
-  status: string;
-  applied_at: string;
+  is_whitelisted: boolean;
+  is_active: boolean;
+  created_at: string;
 }
 
-interface WhitelistApplicationsPage {
-  items: WhitelistApplication[];
+interface WhitelistUsersPage {
+  items: WhitelistUser[];
   total: number;
   page: number;
   page_size: number;
 }
 
-async function fetchApplications(page: number, pageSize: number): Promise<WhitelistApplicationsPage> {
+async function fetchWhitelistedUsers(page: number, pageSize: number): Promise<WhitelistUsersPage> {
   const res = await adminApiGet(
-    `/api/admin/whitelist/applications?page=${page}&page_size=${pageSize}`
+    `/api/admin/whitelist/users?page=${page}&page_size=${pageSize}`
   );
   if (res.status === 401) {
     clearStoredAdminToken();
     window.location.href = "/admin/login";
     return { items: [], total: 0, page, page_size: pageSize };
   }
-  if (!res.ok) throw new Error("Failed to load applications");
+  if (!res.ok) throw new Error("Failed to load whitelist users");
   return res.json();
 }
 
@@ -47,50 +48,34 @@ export default function AdminWhitelist() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const pageSize = 25;
+  const [inviteEmail, setInviteEmail] = useState("");
 
   const {
-    data: applicationsPage,
+    data: usersPage,
     isLoading,
     error,
-  } = useQuery<WhitelistApplicationsPage>({
-    queryKey: ["/api/admin/whitelist/applications", page],
-    queryFn: () => fetchApplications(page, pageSize),
+  } = useQuery<WhitelistUsersPage>({
+    queryKey: ["/api/admin/whitelist/users", page],
+    queryFn: () => fetchWhitelistedUsers(page, pageSize),
   });
 
-  const applications = applicationsPage?.items ?? [];
-  const total = applicationsPage?.total ?? 0;
+  const users = usersPage?.items ?? [];
+  const total = usersPage?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const approveMutation = useMutation({
-    mutationFn: async (applicationId: number) => {
-      const res = await adminApiPost(`/api/admin/whitelist/applications/${applicationId}/approve`);
+  const inviteMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await adminApiPost("/api/admin/whitelist/invite", { email });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.detail || "Approve failed");
+        throw new Error(data.detail || data.message || "Invite failed");
       }
-      return res.json();
-    },
-    onSuccess: (_, id) => {
-      toast({ title: "Approved", description: "Signup email sent to the applicant." });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/whitelist/applications"] });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const denyMutation = useMutation({
-    mutationFn: async (applicationId: number) => {
-      const res = await adminApiPost(`/api/admin/whitelist/applications/${applicationId}/deny`);
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.detail || "Deny failed");
-      }
-      return res.json();
+      return data;
     },
     onSuccess: () => {
-      toast({ title: "Denied", description: "Application denied." });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/whitelist/applications"] });
+      toast({ title: "Invite sent", description: "Signup email sent to the driver." });
+      setInviteEmail("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/whitelist/users"] });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -148,16 +133,37 @@ export default function AdminWhitelist() {
           className="glass-panel rounded-2xl overflow-hidden"
         >
           <div className="p-6 border-b border-white/10">
-            <h1 className="text-xl font-display font-bold text-white tracking-wider">Pending whitelist applications</h1>
+            <h1 className="text-xl font-display font-bold text-white tracking-wider">Whitelist access</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Approve to send a signup link to the applicant. Deny to reject the request.
+              Invite drivers and send signup links.
             </p>
+            <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-center">
+              <input
+                type="email"
+                className="flex-1 h-10 rounded-md bg-background border border-white/10 px-3 text-sm text-white placeholder:text-muted-foreground"
+                placeholder="driver@example.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+              />
+              <Button
+                size="sm"
+                className="h-10 px-4 font-display uppercase tracking-wider bg-primary text-primary-foreground"
+                onClick={() => inviteMutation.mutate(inviteEmail.trim().toLowerCase())}
+                disabled={inviteMutation.isPending || !inviteEmail.trim()}
+              >
+                {inviteMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Send invite"
+                )}
+              </Button>
+            </div>
           </div>
 
           {error && (
             <div className="mx-6 mt-4 flex items-center gap-3 rounded-lg bg-destructive/10 border border-destructive/30 p-4">
               <ShieldAlert className="w-5 h-5 text-destructive flex-shrink-0" />
-              <p className="text-sm text-destructive">Failed to load applications. You may need to sign in again.</p>
+              <p className="text-sm text-destructive">Failed to load whitelist users. You may need to sign in again.</p>
               <Link href="/admin/login">
                 <Button variant="outline" size="sm" className="border-destructive/30 text-destructive">
                   Go to login
@@ -170,60 +176,27 @@ export default function AdminWhitelist() {
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-10 h-10 text-primary animate-spin" />
             </div>
-          ) : applications.length === 0 && !error ? (
+          ) : users.length === 0 && !error ? (
             <div className="py-16 text-center text-muted-foreground">
-              <p className="font-display uppercase tracking-wider text-sm">No pending applications</p>
-              <p className="text-sm mt-1">New requests will appear here.</p>
+              <p className="font-display uppercase tracking-wider text-sm">No whitelisted users</p>
+              <p className="text-sm mt-1">Invited drivers will appear here after they create accounts.</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="border-white/10 hover:bg-transparent">
                   <TableHead className="text-muted-foreground font-display uppercase tracking-wider text-xs">Email</TableHead>
-                  <TableHead className="text-muted-foreground font-display uppercase tracking-wider text-xs">Applied</TableHead>
-                  <TableHead className="text-muted-foreground font-display uppercase tracking-wider text-xs text-right">Actions</TableHead>
+                  <TableHead className="text-muted-foreground font-display uppercase tracking-wider text-xs">Created</TableHead>
+                  <TableHead className="text-muted-foreground font-display uppercase tracking-wider text-xs">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {applications.map((app) => (
-                  <TableRow key={app.id} className="border-white/10">
-                    <TableCell className="text-white font-medium">{app.email}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{formatDate(app.applied_at)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-green-500/30 text-green-400 hover:bg-green-500/10"
-                          onClick={() => approveMutation.mutate(app.id)}
-                          disabled={approveMutation.isPending || denyMutation.isPending}
-                        >
-                          {approveMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <>
-                              <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                              Approve
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-destructive/30 text-destructive hover:bg-destructive/10"
-                          onClick={() => denyMutation.mutate(app.id)}
-                          disabled={approveMutation.isPending || denyMutation.isPending}
-                        >
-                          {denyMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <>
-                              <XCircle className="w-4 h-4 mr-1.5" />
-                              Deny
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                {users.map((user) => (
+                  <TableRow key={user.id} className="border-white/10">
+                    <TableCell className="text-white font-medium">{user.email}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{formatDate(user.created_at)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {user.is_whitelisted ? (user.is_active ? "Active" : "Disabled") : "Not whitelisted"}
                     </TableCell>
                   </TableRow>
                 ))}

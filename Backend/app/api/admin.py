@@ -13,6 +13,7 @@ from app.services.whitelist_service import (
     get_pending_applications,
     approve_application,
     deny_application,
+    create_direct_invite,
 )
 from app.api.dependencies import get_current_super_admin
 from app.core.email import send_whitelist_approved_email
@@ -61,8 +62,27 @@ class PaginatedWhitelistApplications(BaseModel):
     page_size: int
 
 
+class WhitelistInviteRequest(BaseModel):
+    email: str
+
+
 class AdminQuestionnaireUsersPage(BaseModel):
     items: list[AdminQuestionnaireUser]
+    total: int
+    page: int
+    page_size: int
+
+
+class AdminWhitelistUser(BaseModel):
+    id: int
+    email: str
+    is_whitelisted: bool
+    is_active: bool
+    created_at: datetime
+
+
+class AdminWhitelistUsersPage(BaseModel):
+    items: list[AdminWhitelistUser]
     total: int
     page: int
     page_size: int
@@ -112,6 +132,54 @@ async def list_pending(
     )
 
 
+@router.get("/whitelist/users", response_model=AdminWhitelistUsersPage)
+async def list_whitelisted_users(
+    db: AsyncSession = Depends(get_db),
+    _: SuperAdmin = Depends(get_current_super_admin),
+    page: int = 1,
+    page_size: int = 25,
+):
+    """
+    List all whitelisted users (approved drivers) with pagination.
+    """
+    if page < 1:
+        page = 1
+    if page_size < 1 or page_size > 100:
+        page_size = 25
+
+    base_query = select(User).where(User.is_whitelisted.is_(True))
+
+    total_result = await db.execute(
+        select(sa.func.count()).select_from(base_query.subquery())
+    )
+    total = total_result.scalar() or 0
+
+    result = await db.execute(
+        base_query.order_by(User.created_at.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    users = result.scalars().all()
+
+    items = [
+        AdminWhitelistUser(
+            id=u.id,
+            email=u.email,
+            is_whitelisted=u.is_whitelisted,
+            is_active=u.is_active,
+            created_at=u.created_at,
+        )
+        for u in users
+    ]
+
+    return AdminWhitelistUsersPage(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
 @router.post("/whitelist/applications/{application_id}/approve", response_model=ApproveDenyResponse)
 async def approve(
     application_id: int,
@@ -138,6 +206,27 @@ async def deny(
     success, message = await deny_application(db, application_id)
     if not success:
         raise HTTPException(status_code=400, detail=message)
+    return ApproveDenyResponse(success=True, message=message)
+
+
+@router.post("/whitelist/invite", response_model=ApproveDenyResponse)
+async def invite_whitelist_user(
+    body: WhitelistInviteRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    _: SuperAdmin = Depends(get_current_super_admin),
+):
+    """
+    Directly invite a driver by email:
+      - Marks/creates the user as whitelisted.
+      - Generates a signup token.
+      - Sends the standard whitelist-approved signup email.
+    """
+    success, message, email, signup_link = await create_direct_invite(db, body.email)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    if email and signup_link:
+        background_tasks.add_task(send_whitelist_approved_email, email, signup_link)
     return ApproveDenyResponse(success=True, message=message)
 
 

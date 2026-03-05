@@ -139,3 +139,57 @@ async def resend_signup_link(
         return False, "No valid signup link found for this email. Please contact support.", None, None
     signup_link = f"{settings.frontend_signup_url}?token={app.signup_token}"
     return True, "Signup link sent. Check your email.", app.email, signup_link
+
+
+async def create_direct_invite(
+    db: AsyncSession,
+    email: str,
+) -> tuple[bool, str, str | None, str | None]:
+    """
+    Create a direct whitelist invite for the given email:
+      - Mark / create the user as whitelisted.
+      - Create an approved WhitelistApplication with a fresh signup token.
+      - Return (success, message, email, signup_link).
+
+    This is used by the super admin to onboard drivers without a public
+    "Join Beta" application.
+    """
+    normalized_email = email.strip().lower()
+    if not normalized_email:
+        return False, "Email is required", None, None
+
+    # If the user already has a password-based account, don't create a new invite.
+    user_result = await db.execute(select(User).where(User.email == normalized_email))
+    user = user_result.scalar_one_or_none()
+    if user and user.hashed_password:
+        return False, "User already has an account", None, None
+
+    now = datetime.now(timezone.utc)
+
+    # Create an approved whitelist application with a new signup token.
+    app = WhitelistApplication(
+        email=normalized_email,
+        status=WhitelistStatus.APPROVED.value,
+        applied_at=now,
+        reviewed_at=now,
+        signup_token=WhitelistApplication.generate_signup_token(),
+        signup_token_expires_at=now + timedelta(days=7),
+    )
+    db.add(app)
+
+    # Ensure user exists and is marked whitelisted.
+    if not user:
+        user = User(
+            email=normalized_email,
+            hashed_password=None,
+            provider="email",
+            is_whitelisted=True,
+        )
+        db.add(user)
+    else:
+        user.is_whitelisted = True
+
+    await db.flush()
+
+    signup_link = f"{settings.frontend_signup_url}?token={app.signup_token}"
+    return True, "Invite created and signup email sent.", app.email, signup_link

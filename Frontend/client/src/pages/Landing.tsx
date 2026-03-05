@@ -52,23 +52,11 @@ export default function Landing() {
                     </Button>
                   </Link>
                 ) : (
-                  <>
-                    <Link href="/join">
-                      <Button 
-                        size="lg" 
-                        className="w-full sm:w-auto h-14 px-8 text-lg font-display uppercase tracking-wider bg-primary text-white shadow-[0_0_20px_rgba(225,29,72,0.4)]"
-                        data-testid="button-join-beta"
-                      >
-                        Join Beta
-                        <ChevronRight className="ml-2 w-5 h-5" />
-                      </Button>
-                    </Link>
-                    <Link href="/login">
-                      <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-lg font-display uppercase tracking-wider border-white/20">
-                        Driver Login
-                      </Button>
-                    </Link>
-                  </>
+                  <Link href="/login">
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-lg font-display uppercase tracking-wider border-white/20">
+                      Driver Login
+                    </Button>
+                  </Link>
                 )}
                 
                 <Link href="/pricing">

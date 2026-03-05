@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,9 +7,9 @@ import { Gauge, Mail, ArrowLeft, Loader2, ShieldAlert, Eye, EyeOff } from "lucid
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
-import { apiFetch, apiPost, setStoredToken } from "@/lib/api";
+import { apiFetch, apiPost, setStoredToken, getStoredToken } from "@/lib/api";
 import { renderGoogleButton, getGoogleClientId } from "@/lib/google-auth";
+import { notifyHostAboutToken } from "@/lib/desktop-bridge";
 
 type LoginStep = "choose" | "email-check" | "password" | "register";
 
@@ -24,9 +24,15 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasCallbackPort, setHasCallbackPort] = useState(false);
+  const [callbackSent, setCallbackSent] = useState(false);
+  const chooseGoogleRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    const params = new URLSearchParams(window.location.search);
+    const callbackPort = params.get("callback_port");
+    setHasCallbackPort(!!callbackPort);
+    if (isAuthenticated && !callbackPort) {
       setLocation("/onboarding");
     }
   }, [isAuthenticated, setLocation]);
@@ -45,9 +51,18 @@ export default function Login() {
           setError(data.detail || data.message || "Google sign-in failed.");
           return;
         }
-        if (data.access_token) setStoredToken(data.access_token);
+        if (data.access_token) {
+          setStoredToken(data.access_token);
+          await notifyHostAboutToken(data.access_token);
+          if (hasCallbackPort) {
+            setCallbackSent(true);
+          }
+        }
         toast({ title: "Welcome back", description: "You have been logged in successfully." });
-        window.location.href = "/onboarding";
+
+        if (!hasCallbackPort) {
+          window.location.href = "/onboarding";
+        }
       } catch {
         setError("Something went wrong. Please try again.");
       } finally {
@@ -55,6 +70,12 @@ export default function Login() {
       }
     }, setError);
   };
+
+  // Ensure the Google button is rendered reliably whenever step/config changes.
+  useEffect(() => {
+    if (!chooseGoogleRef.current) return;
+    renderChooseGoogleButton(chooseGoogleRef.current);
+  }, [step, googleConfigured]);
 
   useEffect(() => {
     apiFetch("/api/auth/providers")
@@ -71,6 +92,33 @@ export default function Login() {
     } else if (err === "auth_failed") {
       setError("Authentication failed. Please try again.");
     }
+  }, []);
+
+  // If the user is already logged in and the desktop app opened this page
+  // with a callback_port, validate the existing token and, if still valid,
+  // send it back so the app doesn't wait for an explicit login action.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const callbackPort = params.get("callback_port");
+    if (!callbackPort) return;
+
+    const token = getStoredToken();
+    if (!token) return;
+
+    (async () => {
+      try {
+        const res = await apiFetch("/api/auth/me");
+        if (!res.ok) {
+          // Token is no longer valid; let the normal login flow proceed.
+          return;
+        }
+        await notifyHostAboutToken(token);
+        setCallbackSent(true);
+      } catch {
+        // Ignore network / validation errors; desktop app will trigger a fresh login.
+      }
+    })();
   }, []);
 
   const handleCheckEmail = async () => {
@@ -108,9 +156,18 @@ export default function Login() {
         setLoading(false);
         return;
       }
-      if (data.access_token) setStoredToken(data.access_token);
+      if (data.access_token) {
+        setStoredToken(data.access_token);
+        await notifyHostAboutToken(data.access_token);
+        if (hasCallbackPort) {
+          setCallbackSent(true);
+        }
+      }
       toast({ title: "Welcome back", description: "You have been logged in successfully." });
-      window.location.href = "/onboarding";
+
+      if (!hasCallbackPort) {
+        window.location.href = "/onboarding";
+      }
     } catch {
       setError("Something went wrong. Please try again.");
     }
@@ -165,6 +222,11 @@ export default function Login() {
               {step === "password" && "Enter your password to continue"}
               {step === "register" && "Set up your credentials to get started"}
             </p>
+            {hasCallbackPort && callbackSent && (
+              <p className="mt-3 text-xs text-emerald-400">
+                Login complete. You can now return to the Flow application.
+              </p>
+            )}
           </div>
 
           <AnimatePresence mode="wait">
@@ -215,7 +277,7 @@ export default function Login() {
                 </div>
 
                 <div
-                  ref={(el) => el && renderChooseGoogleButton(el)}
+                  ref={chooseGoogleRef}
                   className="min-h-[3.5rem] w-full flex items-center justify-center [&>div]:min-h-[3.5rem]"
                   data-testid="container-login-google"
                 />

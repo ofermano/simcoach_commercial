@@ -93,6 +93,7 @@ def _base_html_template(title: str, heading: str, body_html: str) -> str:
 async def send_super_admin_code_email(to_email: str, code: str) -> bool:
     """Send 6-digit login code to super admin email."""
     if not settings.smtp_user or not settings.smtp_password:
+        print("email settings not found")
         return False
     conf = _get_mail_config()
 
@@ -126,7 +127,8 @@ async def send_super_admin_code_email(to_email: str, code: str) -> bool:
     try:
         await mail.send_message(message)
         return True
-    except Exception:
+    except Exception as e:
+        print("Error in send_super_admin_code_email:", repr(e))
         return False
 
 
